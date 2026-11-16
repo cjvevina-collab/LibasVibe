@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'osCRozo2yBgIk3TD0PLmRMcd2RC3';
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'slug'])
+        && data.keys().hasOnly(['name', 'slug', 'description', 'imageUrl', 'sortOrder', 'createdAt'])
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 60
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 60
+        && (!('description' in data) || (data.description is string && data.description.size() <= 240))
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500))
+        && (!('sortOrder' in data) || data.sortOrder is number);
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['title', 'category', 'price', 'imageUrl', 'inStock'])
+        && data.keys().hasOnly(['title', 'sku', 'category', 'price', 'compareAtPrice', 'description', 'fabric', 'imageUrl', 'sizes', 'inStock', 'featured', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 120
+        && data.category is string && data.category.size() >= 2 && data.category.size() <= 60
+        && data.price is number && data.price >= 0
+        && data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 800
+        && data.inStock is bool
+        && (!('sku' in data) || (data.sku is string && data.sku.size() <= 40))
+        && (!('compareAtPrice' in data) || data.compareAtPrice is number)
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1200))
+        && (!('fabric' in data) || (data.fabric is string && data.fabric.size() <= 120))
+        && (!('sizes' in data) || (data.sizes is list && data.sizes.size() <= 10))
+        && (!('featured' in data) || data.featured is bool);
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['orderCode', 'customerName', 'phone', 'address', 'city', 'items', 'subtotal', 'deliveryFee', 'total', 'status'])
+        && data.keys().hasOnly(['orderCode', 'customerName', 'phone', 'email', 'address', 'city', 'notes', 'paymentMethod', 'items', 'subtotal', 'deliveryFee', 'total', 'status', 'createdAt', 'updatedAt'])
+        && data.orderCode is string && data.orderCode.size() >= 4 && data.orderCode.size() <= 32
+        && data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 100
+        && data.phone is string && data.phone.size() >= 7 && data.phone.size() <= 25
+        && data.address is string && data.address.size() >= 5 && data.address.size() <= 300
+        && data.city is string && data.city.size() >= 2 && data.city.size() <= 80
+        && data.items is list && data.items.size() >= 1 && data.items.size() <= 50
+        && data.subtotal is number && data.subtotal >= 0
+        && data.deliveryFee is number && data.deliveryFee >= 0
+        && data.total is number && data.total >= 0
+        && data.status in ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled']
+        && (!('email' in data) || (data.email is string && data.email.size() <= 120))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 400))
+        && (!('paymentMethod' in data) || data.paymentMethod in ['COD', 'WhatsApp']);
+    }
+
+    // Categories: public catalog read, Admin UID write
+    match /categories/{categoryId} {
+      allow list: if true;
+      allow get: if isValidId(categoryId);
+      allow create, update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isAdmin() && isValidId(categoryId);
+    }
+
+    // Products: public catalog read, Admin UID write
+    match /products/{productId} {
+      allow list: if true;
+      allow get: if isValidId(productId);
+      allow create, update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow delete: if isAdmin() && isValidId(productId);
+    }
+
+    // Orders: customers can create Pending orders and look up by exact Order Code ID; Admin UID manages all orders
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if isAdmin();
+      allow create: if isValidId(orderId) && isValidOrder(incoming()) && incoming().status == 'Pending';
+      allow update: if isAdmin() && isValidId(orderId) && isValidOrder(incoming());
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+  }
+}

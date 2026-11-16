@@ -1,0 +1,8 @@
+{
+  "name": "LibasVibe by FARHAN",
+  "description": "Contemporary modest pret, luxury festive couture, and timeless stitched ensembles — libasvibe.com",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

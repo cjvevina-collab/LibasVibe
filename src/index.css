@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --color-canvas: #FAF9F7;
+  --color-surface: #FFFFFF;
+  --color-stone: #F3EFEA;
+  --color-ink: #232220;
+  --color-ink-muted: #68625C;
+  --color-copper: #B68167;
+  --color-copper-dark: #97634A;
+  --color-copper-light: #E8D5CB;
+  --color-hairline: #E6DFD8;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #FAF9F7;
+    color: #232220;
+    scroll-behavior: smooth;
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+}
+
+/* Custom sleek rose-copper scrollbar effect */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F3EFEA;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #B68167;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #97634A;
+}
+
+/* Marquee strip animation */
+@keyframes lv-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-lv-marquee {
+  display: flex;
+  width: max-content;
+  animation: lv-marquee 32s linear infinite;
+}
+
+.animate-lv-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-lv-marquee {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Tabular figures for pricing & quantities */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide default cursor on desktop fine pointers when custom cursor is active */
+@media (pointer: fine) {
+  .has-custom-cursor,
+  .has-custom-cursor a,
+  .has-custom-cursor button,
+  .has-custom-cursor [role="button"] {
+    cursor: none !important;
+  }
+}

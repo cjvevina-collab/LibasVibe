@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Clothing product category managed by admin",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 60, "pattern": "^[a-z0-9-]+$" },
+        "description": { "type": "string", "maxLength": 240 },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "slug"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Clothing garment or ensemble in the LibasVibe catalog",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "sku": { "type": "string", "maxLength": 40 },
+        "category": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "price": { "type": "number" },
+        "compareAtPrice": { "type": "number" },
+        "description": { "type": "string", "maxLength": 1200 },
+        "fabric": { "type": "string", "maxLength": 120 },
+        "imageUrl": { "type": "string", "minLength": 5, "maxLength": 800 },
+        "sizes": { "type": "array" },
+        "inStock": { "type": "boolean" },
+        "featured": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "price", "imageUrl", "inStock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order placed on libasvibe.com",
+      "type": "object",
+      "properties": {
+        "orderCode": { "type": "string", "minLength": 4, "maxLength": 32 },
+        "customerName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "phone": { "type": "string", "minLength": 7, "maxLength": 25 },
+        "email": { "type": "string", "maxLength": 120 },
+        "address": { "type": "string", "minLength": 5, "maxLength": 300 },
+        "city": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "notes": { "type": "string", "maxLength": 400 },
+        "paymentMethod": { "type": "string", "enum": ["COD", "WhatsApp"] },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderCode", "customerName", "phone", "address", "city", "items", "subtotal", "deliveryFee", "total", "status"]
+    }
+  },
+  "firestore": {
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Storefront clothing categories"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Storefront clothing products"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer checkout orders"
+    }
+  }
+}
