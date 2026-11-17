@@ -1,33 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { ProductCard } from '../components/ProductCard';
-import { CAMPAIGN_BANNER_IMAGE, HERO_BANNER_IMAGE } from '../data/seedCatalog';
 import { BRAND_INFO } from '../lib/firebase';
-
-const HERO_SLIDES = [
-  {
-    id: 'slide-1',
-    image: HERO_BANNER_IMAGE,
-    mobileFocusClass: 'object-[78%_18%] sm:object-center',
-    kicker: 'LibasVibe by Farhan',
-    headline: 'Crafted Grace in Motion',
-    subtitle: 'Contemporary pret and festive couture tailored in silk and damask.',
-    ctaLabel: 'Shop Collection',
-    ctaTo: '/shop',
-  },
-  {
-    id: 'slide-2',
-    image: CAMPAIGN_BANNER_IMAGE,
-    mobileFocusClass: 'object-[38%_18%] sm:object-center',
-    kicker: 'Seasonal Lookbook',
-    headline: 'Signature Damask & Silk',
-    subtitle: 'Effortless drape with brushed rose-copper detailing.',
-    ctaLabel: 'Explore Collections',
-    ctaTo: '/collections',
-  },
-];
 
 const TESTIMONIALS = [
   {
@@ -51,18 +27,36 @@ const TESTIMONIALS = [
     quote:
       'Breathable cotton-linen with crisp pleated cuffs. Clean stitching inside and out, and WhatsApp sizing help was prompt.',
   },
+  {
+    id: 't4',
+    name: 'Maham Raza',
+    location: 'Rawalpindi · Shabnam Charcoal Damask Set',
+    quote:
+      'The damask jacquard fabric feels substantial yet light. Free delivery above Rs. 5,000 made checkout effortless.',
+  },
+  {
+    id: 't5',
+    name: 'Sana Farooq',
+    location: 'Faisalabad · Zoya Mauve Organza Kaftan',
+    quote:
+      'Paid seamlessly via Easypaisa and received tracking updates right away. The kaftan neckline detailing looks truly bespoke.',
+  },
 ];
 
 const FAQS = [
   {
-    q: 'What is the delivery fee and how long does shipping take?',
-    a: `We offer flat Standard Delivery of Rs. ${BRAND_INFO.standardDeliveryFee.toFixed(
+    q: 'What is the delivery fee and when is delivery free?',
+    a: `Orders above Rs. ${BRAND_INFO.freeDeliveryThreshold.toLocaleString(
+      'en-PK'
+    )} qualify for Free Nationwide Delivery. Orders of Rs. ${BRAND_INFO.freeDeliveryThreshold.toLocaleString(
+      'en-PK'
+    )} or below have a flat Standard Delivery charge of Rs. ${BRAND_INFO.standardDeliveryFee.toFixed(
       2
-    )} nationwide across Pakistan. Orders are dispatched within 24 to 48 hours and arrive within 2 to 5 working days.`,
+    )}.`,
   },
   {
-    q: 'Is Cash on Delivery (COD) available?',
-    a: 'Yes, Cash on Delivery is available on all orders nationwide. You can also choose to confirm your order directly via WhatsApp at checkout.',
+    q: 'What payment methods are accepted?',
+    a: 'We accept Cash on Delivery (COD), Easypaisa (03393923100 — Farhan), Bank Al Habib Ltd transfer (12340981001738016 — Farhan s/o Abdul Hameed), and WhatsApp order confirmation.',
   },
   {
     q: 'How can I verify my size before placing an order?',
@@ -74,119 +68,162 @@ const FAQS = [
   },
 ];
 
+function getMobileFocusClass(focus?: 'left' | 'center' | 'right'): string {
+  if (focus === 'right') return 'object-[78%_18%] sm:object-center';
+  if (focus === 'left') return 'object-[32%_18%] sm:object-center';
+  return 'object-center';
+}
+
 export const HomePage: React.FC = () => {
-  const { products } = useStore();
+  const { products, banners } = useStore();
+  const activeBanners = useMemo(() => {
+    const filtered = banners.filter((b) => b.active);
+    return filtered.length > 0 ? filtered : banners;
+  }, [banners]);
+
   const featuredProducts = products.filter((p) => p.featured).slice(0, 6);
   const displayProducts =
     featuredProducts.length > 0 ? featuredProducts : products.slice(0, 6);
 
   const [activeSlide, setActiveSlide] = useState(0);
+  const [testimonialIndex, setTestimonialIndex] = useState(0);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (activeSlide >= activeBanners.length && activeBanners.length > 0) {
+      setActiveSlide(0);
+    }
+  }, [activeBanners.length, activeSlide]);
+
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || activeBanners.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % activeBanners.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [activeBanners.length]);
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced) return;
     const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length);
-    }, 6000);
+      setTestimonialIndex((prev) => (prev + 1) % TESTIMONIALS.length);
+    }, 5000);
     return () => clearInterval(timer);
   }, []);
 
-  const currentSlide = HERO_SLIDES[activeSlide];
+  const currentSlide = activeBanners[activeSlide] || activeBanners[0];
+
+  const visibleTestimonials = useMemo(() => {
+    const items = [];
+    for (let i = 0; i < 3; i++) {
+      items.push(TESTIMONIALS[(testimonialIndex + i) % TESTIMONIALS.length]);
+    }
+    return items;
+  }, [testimonialIndex]);
 
   return (
     <div className="w-full">
-      {/* 1. Full-Width 2-Slide Mobile-Responsive Hero Banner */}
-      <section
-        aria-label="Featured Collections"
-        className="relative w-full overflow-hidden bg-[#232220]"
-      >
-        <div className="relative min-h-[68vh] sm:min-h-[76vh] lg:min-h-[82vh] w-full flex items-end sm:items-center">
-          {HERO_SLIDES.map((slide, idx) => (
-            <img
-              key={slide.id}
-              src={slide.image}
-              alt={slide.headline}
-              referrerPolicy="no-referrer"
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
-                slide.mobileFocusClass
-              } ${idx === activeSlide ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      {/* 1. Full-Width Dynamic Hero Banner Slider */}
+      {currentSlide && (
+        <section
+          aria-label="Featured Collections"
+          className="relative w-full overflow-hidden bg-[#232220]"
+        >
+          <div className="relative min-h-[68vh] sm:min-h-[76vh] lg:min-h-[82vh] w-full flex items-end sm:items-center">
+            {activeBanners.map((slide, idx) => (
+              <img
+                key={slide.id}
+                src={slide.imageUrl}
+                alt={slide.headline}
+                referrerPolicy="no-referrer"
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${getMobileFocusClass(
+                  slide.mobileFocus
+                )} ${idx === activeSlide ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              />
+            ))}
+
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-t from-[#232220]/85 via-[#232220]/35 to-transparent sm:bg-gradient-to-r sm:from-[#232220]/75 sm:via-[#232220]/30 sm:to-transparent"
             />
-          ))}
 
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-t from-[#232220]/85 via-[#232220]/35 to-transparent sm:bg-gradient-to-r sm:from-[#232220]/75 sm:via-[#232220]/30 sm:to-transparent"
-          />
-
-          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-24 sm:px-6 sm:py-20 lg:px-8">
-            <div className="max-w-lg text-[#FAF9F7]">
-              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#DFB8A4]">
-                {currentSlide.kicker}
-              </p>
-              <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.06] tracking-tight sm:text-5xl lg:text-6xl text-balance">
-                {currentSlide.headline}
-              </h1>
-              <p className="mt-3 text-sm sm:text-base text-[#FAF9F7]/85 max-w-sm">
-                {currentSlide.subtitle}
-              </p>
-              <div className="mt-7">
-                <Link
-                  to={currentSlide.ctaTo}
-                  className="inline-flex items-center gap-2.5 rounded-full bg-[#FAF9F7] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#232220] transition-colors duration-200 hover:bg-[#B68167] hover:text-white"
-                >
-                  <span>{currentSlide.ctaLabel}</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-24 sm:px-6 sm:py-20 lg:px-8">
+              <div className="max-w-lg text-[#FAF9F7]">
+                {currentSlide.kicker && (
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#DFB8A4]">
+                    {currentSlide.kicker}
+                  </p>
+                )}
+                <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.06] tracking-tight sm:text-5xl lg:text-6xl text-balance">
+                  {currentSlide.headline}
+                </h1>
+                {currentSlide.subtitle && (
+                  <p className="mt-3 text-sm sm:text-base text-[#FAF9F7]/85 max-w-sm">
+                    {currentSlide.subtitle}
+                  </p>
+                )}
+                <div className="mt-7">
+                  <Link
+                    to={currentSlide.buttonLink || '/shop'}
+                    className="inline-flex items-center gap-2.5 rounded-full bg-[#FAF9F7] px-7 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#232220] transition-colors duration-200 hover:bg-[#5C1626] hover:text-white"
+                  >
+                    <span>{currentSlide.buttonLabel || 'Shop Collection'}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Slider Controls */}
-          <div className="absolute bottom-5 right-4 left-4 z-20 mx-auto flex max-w-7xl items-center justify-between sm:px-2 lg:px-4">
-            <div className="flex items-center gap-2">
-              {HERO_SLIDES.map((slide, idx) => (
-                <button
-                  key={slide.id}
-                  type="button"
-                  onClick={() => setActiveSlide(idx)}
-                  aria-label={`Show banner slide ${idx + 1}`}
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    idx === activeSlide
-                      ? 'w-10 bg-[#DFB8A4]'
-                      : 'w-4 bg-[#FAF9F7]/40 hover:bg-[#FAF9F7]/70'
-                  }`}
-                />
-              ))}
-            </div>
+            {activeBanners.length > 1 && (
+              <div className="absolute bottom-5 right-4 left-4 z-20 mx-auto flex max-w-7xl items-center justify-between sm:px-2 lg:px-4">
+                <div className="flex items-center gap-2">
+                  {activeBanners.map((slide, idx) => (
+                    <button
+                      key={slide.id}
+                      type="button"
+                      onClick={() => setActiveSlide(idx)}
+                      aria-label={`Show banner slide ${idx + 1}`}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        idx === activeSlide
+                          ? 'w-10 bg-[#DFB8A4]'
+                          : 'w-4 bg-[#FAF9F7]/40 hover:bg-[#FAF9F7]/70'
+                      }`}
+                    />
+                  ))}
+                </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveSlide(
-                    (prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length
-                  )
-                }
-                aria-label="Previous banner"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#FAF9F7]/30 bg-[#232220]/40 text-[#FAF9F7] backdrop-blur-sm transition-colors hover:border-[#DFB8A4] hover:bg-[#232220]"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveSlide((prev) => (prev + 1) % HERO_SLIDES.length)
-                }
-                aria-label="Next banner"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#FAF9F7]/30 bg-[#232220]/40 text-[#FAF9F7] backdrop-blur-sm transition-colors hover:border-[#DFB8A4] hover:bg-[#232220]"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveSlide(
+                        (prev) =>
+                          (prev - 1 + activeBanners.length) % activeBanners.length
+                      )
+                    }
+                    aria-label="Previous banner"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#FAF9F7]/30 bg-[#232220]/40 text-[#FAF9F7] backdrop-blur-sm transition-colors hover:border-[#DFB8A4] hover:bg-[#232220]"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveSlide((prev) => (prev + 1) % activeBanners.length)
+                    }
+                    aria-label="Next banner"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#FAF9F7]/30 bg-[#232220]/40 text-[#FAF9F7] backdrop-blur-sm transition-colors hover:border-[#DFB8A4] hover:bg-[#232220]"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 2. Featured Collection Grid (2 columns on mobile, 3 on desktop) */}
       <section className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
@@ -215,23 +252,53 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. Client Testimonials */}
+      {/* 3. Sliding Client Testimonials (5 Total) */}
       <section className="w-full border-t border-[#E6DFD8] bg-white">
         <div className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
-          <div className="border-b border-[#E6DFD8] pb-6">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#97634A]">
-              Client Notes
-            </p>
-            <h2 className="mt-1 font-display text-3xl font-semibold text-[#232220] sm:text-4xl">
-              Worn &amp; Reviewed
-            </h2>
+          <div className="flex items-end justify-between gap-4 border-b border-[#E6DFD8] pb-6">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#97634A]">
+                Client Notes
+              </p>
+              <h2 className="mt-1 font-display text-3xl font-semibold text-[#232220] sm:text-4xl">
+                Worn &amp; Reviewed
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setTestimonialIndex(
+                    (prev) => (prev - 1 + TESTIMONIALS.length) % TESTIMONIALS.length
+                  )
+                }
+                aria-label="Previous testimonial"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E6DFD8] bg-[#FAF9F7] text-[#232220] hover:border-[#B68167]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setTestimonialIndex((prev) => (prev + 1) % TESTIMONIALS.length)
+                }
+                aria-label="Next testimonial"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E6DFD8] bg-[#FAF9F7] text-[#232220] hover:border-[#B68167]"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
+          {/* Mobile: 1 sliding testimonial; Desktop: 3 sliding testimonials */}
           <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((item) => (
+            {visibleTestimonials.map((item, idx) => (
               <blockquote
-                key={item.id}
-                className="flex flex-col justify-between rounded-2xl border border-[#E6DFD8] bg-[#FAF9F7] p-6"
+                key={`${item.id}-${idx}`}
+                className={`${
+                  idx > 0 ? 'hidden md:flex' : 'flex'
+                } flex-col justify-between rounded-2xl border border-[#E6DFD8] bg-[#FAF9F7] p-6 transition-all duration-300`}
               >
                 <div>
                   <div className="flex items-center gap-1 text-[#B68167]">
@@ -253,6 +320,23 @@ export const HomePage: React.FC = () => {
                   <p className="text-xs text-[#68625C]">{item.location}</p>
                 </footer>
               </blockquote>
+            ))}
+          </div>
+
+          {/* Slide Dots */}
+          <div className="mt-6 flex items-center justify-center gap-2">
+            {TESTIMONIALS.map((t, idx) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTestimonialIndex(idx)}
+                aria-label={`View testimonial ${idx + 1}`}
+                className={`h-1.5 rounded-full transition-all duration-200 ${
+                  idx === testimonialIndex
+                    ? 'w-7 bg-[#5C1626]'
+                    : 'w-2 bg-[#E6DFD8] hover:bg-[#B68167]'
+                }`}
+              />
             ))}
           </div>
         </div>

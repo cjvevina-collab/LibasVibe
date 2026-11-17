@@ -112,7 +112,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const deliveryFee = items.length > 0 ? BRAND_INFO.standardDeliveryFee : 0;
+  const deliveryFee =
+    items.length === 0
+      ? 0
+      : subtotal > BRAND_INFO.freeDeliveryThreshold
+      ? 0
+      : BRAND_INFO.standardDeliveryFee;
   const grandTotal = subtotal + deliveryFee;
 
   return (

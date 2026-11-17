@@ -2,11 +2,11 @@ import React from 'react';
 import { BRAND_INFO } from '../lib/firebase';
 
 const MARQUEE_ITEMS = [
+  `Free Delivery Above Rs. ${BRAND_INFO.freeDeliveryThreshold.toLocaleString('en-PK')}`,
   `Standard Delivery Rs. ${BRAND_INFO.standardDeliveryFee.toFixed(2)} Nationwide`,
   'LibasVibe by FARHAN · Contemporary Pret & Couture',
-  'Cash on Delivery Available Across Pakistan',
+  'Cash on Delivery, Easypaisa & Bank Al Habib Accepted',
   `WhatsApp & Call Concierge: ${BRAND_INFO.phone}`,
-  'libasvibe.com',
 ];
 
 export const AnnouncementMarquee: React.FC = () => {

@@ -20,7 +20,7 @@ export const Header: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-[#FAF9F7]/95 backdrop-blur-md border-b border-[#E6DFD8]">
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:gap-8 sm:px-6 lg:px-8">
-        {/* Zone 1: Brand mark with larger prominent circular logo */}
+        {/* Zone 1: Brand mark with full unclipped logo */}
         <Link
           to="/"
           onClick={() => setMobileOpen(false)}
@@ -35,7 +35,7 @@ export const Header: React.FC = () => {
                 setLogoSrc(BRAND_INFO.fallbackLogoUrl);
               }
             }}
-            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover border border-[#B68167]/50 shadow-xs"
+            className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-white p-1 object-contain border border-[#E6DFD8] shadow-xs"
           />
           <span className="font-display text-2xl sm:text-[26px] font-semibold tracking-tight text-[#232220]">
             LibasVibe

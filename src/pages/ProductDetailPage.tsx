@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Eye,
-  MessageCircle,
   Minus,
   Plus,
   ShoppingBag,
@@ -16,6 +15,7 @@ import { ProductSize } from '../types/store';
 import { buildWhatsAppUrl, formatPKR } from '../components/Formatters';
 import { BRAND_INFO } from '../lib/firebase';
 import { ProductCard } from '../components/ProductCard';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 interface ProductReview {
   id: string;
@@ -67,6 +67,28 @@ export const ProductDetailPage: React.FC = () => {
   );
   const [quantity, setQuantity] = useState(1);
 
+  const gallery = useMemo(() => {
+    if (!product) return [];
+    const list =
+      product.images && product.images.length > 0
+        ? product.images.filter(Boolean)
+        : [product.imageUrl];
+    return Array.from(new Set(list));
+  }, [product]);
+
+  const [activeImage, setActiveImage] = useState<string>(
+    gallery[0] || product?.imageUrl || ''
+  );
+
+  useEffect(() => {
+    if (gallery[0]) {
+      setActiveImage(gallery[0]);
+    }
+    if (product?.sizes?.[0]) {
+      setSelectedSize(product.sizes[0]);
+    }
+  }, [id, gallery, product]);
+
   // Live product viewer count
   const baseViewers = useMemo(() => {
     if (!id) return 11;
@@ -100,7 +122,7 @@ export const ProductDetailPage: React.FC = () => {
   if (!product) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-24 text-center">
-        <h1 className="font-display text-3xl font-semibold text-[#232220]">
+        <h1 className="font-display text-3xl font-semibold text-[#5C1626]">
           Ensemble Not Found
         </h1>
         <p className="mt-2 text-sm text-[#68625C]">
@@ -108,7 +130,7 @@ export const ProductDetailPage: React.FC = () => {
         </p>
         <Link
           to="/shop"
-          className="mt-6 inline-flex rounded-full bg-[#232220] px-6 py-3 text-xs font-medium uppercase tracking-wider text-white hover:bg-[#B68167]"
+          className="mt-6 inline-flex rounded-full bg-[#5C1626] px-6 py-3 text-xs font-medium uppercase tracking-wider text-white hover:bg-[#46101C]"
         >
           Back to Shop
         </Link>
@@ -117,7 +139,6 @@ export const ProductDetailPage: React.FC = () => {
   }
 
   const related = products.filter((p) => p.id !== product.id).slice(0, 3);
-
   const avgRating = (
     reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
   ).toFixed(1);
@@ -161,19 +182,43 @@ export const ProductDetailPage: React.FC = () => {
       </Link>
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-12">
-        {/* Sticky Left Image */}
+        {/* Sticky Left Image + Multi-Image Thumbnails */}
         <div className="lg:col-span-7 lg:sticky lg:top-24">
           <div className="aspect-[3/4] w-full overflow-hidden rounded-2xl border border-[#E6DFD8] bg-[#F3EFEA]">
             <img
-              src={product.imageUrl}
+              src={activeImage || product.imageUrl}
               alt={product.title}
               referrerPolicy="no-referrer"
               className="h-full w-full object-cover object-top"
             />
           </div>
+
+          {gallery.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {gallery.map((imgUrl, idx) => (
+                <button
+                  key={`${imgUrl}-${idx}`}
+                  type="button"
+                  onClick={() => setActiveImage(imgUrl)}
+                  className={`h-20 w-16 overflow-hidden rounded-lg border-2 transition-all ${
+                    activeImage === imgUrl
+                      ? 'border-[#5C1626]'
+                      : 'border-[#E6DFD8] opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={imgUrl}
+                    alt={`${product.title} view ${idx + 1}`}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover object-top"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Contiguous Purchase Module */}
+        {/* Contiguous Purchase Module (Dark Maroon Accents per Feedback) */}
         <div className="lg:col-span-5">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[#97634A]">
             <span>{product.category}</span>
@@ -185,7 +230,7 @@ export const ProductDetailPage: React.FC = () => {
             )}
           </div>
 
-          <h1 className="mt-2 font-display text-3xl font-semibold text-[#232220] sm:text-4xl">
+          <h1 className="mt-2 font-display text-3xl font-semibold text-[#5C1626] sm:text-4xl">
             {product.title}
           </h1>
 
@@ -208,7 +253,7 @@ export const ProductDetailPage: React.FC = () => {
           </div>
 
           <div className="mt-4 flex items-baseline gap-3 tabular-nums">
-            <span className="text-2xl font-semibold text-[#232220]">
+            <span className="text-2xl font-bold text-[#5C1626]">
               {formatPKR(product.price)}
             </span>
             {product.compareAtPrice && product.compareAtPrice > product.price && (
@@ -229,10 +274,10 @@ export const ProductDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* Size Selector */}
+          {/* Size Selector in Dark Maroon */}
           <div className="mt-6">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#232220]">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5C1626]">
                 Select Size
               </span>
               <span className="text-xs text-[#68625C]">
@@ -248,8 +293,8 @@ export const ProductDetailPage: React.FC = () => {
                   onClick={() => setSelectedSize(size)}
                   className={`min-w-[48px] rounded-lg border px-3.5 py-2.5 text-xs font-semibold transition-colors ${
                     selectedSize === size
-                      ? 'border-[#232220] bg-[#232220] text-white'
-                      : 'border-[#E6DFD8] bg-white text-[#232220] hover:border-[#B68167]'
+                      ? 'border-[#5C1626] bg-[#5C1626] text-white'
+                      : 'border-[#5C1626]/30 bg-white text-[#5C1626] hover:border-[#5C1626]'
                   }`}
                 >
                   {size}
@@ -258,14 +303,14 @@ export const ProductDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Quantity & Add to Bag */}
+          {/* Quantity & Well-Proportioned Add to Bag Button */}
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <div className="inline-flex h-12 items-center justify-between rounded-full border border-[#E6DFD8] bg-white px-3 sm:w-36">
+            <div className="inline-flex h-12 w-full items-center justify-between rounded-full border border-[#E6DFD8] bg-white px-4 sm:w-36 shrink-0">
               <button
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 aria-label="Decrease quantity"
-                className="flex h-8 w-8 items-center justify-center text-[#232220] hover:text-[#B68167]"
+                className="flex h-8 w-8 items-center justify-center text-[#232220] hover:text-[#5C1626]"
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
@@ -274,7 +319,7 @@ export const ProductDetailPage: React.FC = () => {
                 type="button"
                 onClick={() => setQuantity((q) => q + 1)}
                 aria-label="Increase quantity"
-                className="flex h-8 w-8 items-center justify-center text-[#232220] hover:text-[#B68167]"
+                className="flex h-8 w-8 items-center justify-center text-[#232220] hover:text-[#5C1626]"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -284,31 +329,32 @@ export const ProductDetailPage: React.FC = () => {
               type="button"
               disabled={!product.inStock}
               onClick={() => addToCart(product, selectedSize, quantity)}
-              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#232220] px-6 text-xs font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#B68167] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-[48px] w-full flex-1 items-center justify-center gap-2 rounded-full bg-[#5C1626] px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#46101C] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ShoppingBag className="h-4 w-4" />
               <span>{product.inStock ? 'Add to Bag' : 'Sold Out'}</span>
             </button>
           </div>
 
+          {/* Order on WhatsApp Button (No Number Displayed, Real WhatsApp Logo) */}
           <a
             href={buildWhatsAppUrl(whatsappMsg)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full border border-[#E6DFD8] bg-white px-6 text-xs font-semibold uppercase tracking-[0.14em] text-[#232220] transition-colors hover:border-[#B68167] hover:text-[#97634A]"
+            className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2.5 rounded-full border border-[#5C1626]/30 bg-white px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#5C1626] transition-colors hover:border-[#25D366] hover:bg-[#25D366]/5"
           >
-            <MessageCircle className="h-4 w-4 text-[#B68167]" />
-            <span>Order on WhatsApp ({BRAND_INFO.phone})</span>
+            <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+            <span>Order on WhatsApp</span>
           </a>
 
           <div className="mt-6 flex items-start gap-3 rounded-xl border border-[#E6DFD8] bg-[#F3EFEA]/70 p-4 text-xs text-[#68625C]">
             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-[#B68167]" />
             <div>
               <p className="font-medium text-[#232220]">
-                Standard Delivery Rs. {BRAND_INFO.standardDeliveryFee.toFixed(2)}
+                Free Delivery Above Rs. {BRAND_INFO.freeDeliveryThreshold.toLocaleString('en-PK')}
               </p>
               <p className="mt-0.5">
-                Cash on delivery available nationwide. Dispatch within 24–48 hours.
+                Standard Delivery Rs. {BRAND_INFO.standardDeliveryFee.toFixed(2)} for orders Rs. 5,000 or below. Dispatch within 24–48 hours.
               </p>
             </div>
           </div>
@@ -366,7 +412,7 @@ export const ProductDetailPage: React.FC = () => {
               Leave a Review
             </h3>
             {reviewSubmitted && (
-              <p className="rounded-lg bg-[#F3EFEA] px-3 py-2 text-xs font-medium text-[#97634A]">
+              <p className="rounded-lg bg-[#F3EFEA] px-3 py-2 text-xs font-medium text-[#5C1626]">
                 Thank you — your review has been added.
               </p>
             )}
@@ -424,7 +470,7 @@ export const ProductDetailPage: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full rounded-full bg-[#232220] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#B68167]"
+              className="w-full rounded-full bg-[#5C1626] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#46101C]"
             >
               Submit Review
             </button>

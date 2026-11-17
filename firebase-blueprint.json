@@ -1,5 +1,23 @@
 {
   "entities": {
+    "BannerSlide": {
+      "title": "BannerSlide",
+      "description": "Homepage hero banner managed by admin",
+      "type": "object",
+      "properties": {
+        "kicker": { "type": "string", "maxLength": 60 },
+        "headline": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "subtitle": { "type": "string", "maxLength": 240 },
+        "buttonLabel": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "buttonLink": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "imageUrl": { "type": "string", "minLength": 5, "maxLength": 800 },
+        "mobileFocus": { "type": "string", "enum": ["left", "center", "right"] },
+        "active": { "type": "boolean" },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["headline", "buttonLabel", "buttonLink", "imageUrl", "active"]
+    },
     "Category": {
       "title": "Category",
       "description": "Clothing product category managed by admin",
@@ -27,6 +45,7 @@
         "description": { "type": "string", "maxLength": 1200 },
         "fabric": { "type": "string", "maxLength": 120 },
         "imageUrl": { "type": "string", "minLength": 5, "maxLength": 800 },
+        "images": { "type": "array" },
         "sizes": { "type": "array" },
         "inStock": { "type": "boolean" },
         "featured": { "type": "boolean" },
@@ -47,7 +66,8 @@
         "address": { "type": "string", "minLength": 5, "maxLength": 300 },
         "city": { "type": "string", "minLength": 2, "maxLength": 80 },
         "notes": { "type": "string", "maxLength": 400 },
-        "paymentMethod": { "type": "string", "enum": ["COD", "WhatsApp"] },
+        "paymentMethod": { "type": "string", "enum": ["COD", "Easypaisa", "BankTransfer", "WhatsApp"] },
+        "paymentRef": { "type": "string", "maxLength": 120 },
         "items": { "type": "array" },
         "subtotal": { "type": "number" },
         "deliveryFee": { "type": "number" },
@@ -60,6 +80,10 @@
     }
   },
   "firestore": {
+    "/banners/{bannerId}": {
+      "schema": { "$ref": "#/entities/BannerSlide" },
+      "description": "Homepage hero campaign banners"
+    },
     "/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/Category" },
       "description": "Storefront clothing categories"

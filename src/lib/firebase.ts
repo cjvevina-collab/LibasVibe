@@ -27,6 +27,16 @@ export const BRAND_INFO = {
   logoUrl: 'https://i.postimg.cc/vHwWnc32/logo.jpg',
   fallbackLogoUrl: '/logo.jpg',
   standardDeliveryFee: 199,
+  freeDeliveryThreshold: 5000,
+  easypaisa: {
+    number: '03393923100',
+    title: 'Farhan',
+  },
+  bankAlHabib: {
+    bankName: 'Bank Al Habib Ltd',
+    accountNumber: '12340981001738016',
+    accountTitle: 'Farhan s/o Abdul Hameed',
+  },
 };
 
 export const app = initializeApp(firebaseConfig);

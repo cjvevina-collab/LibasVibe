@@ -7,6 +7,22 @@ export type OrderStatus =
   | 'Delivered'
   | 'Cancelled';
 
+export type PaymentMethod = 'COD' | 'Easypaisa' | 'BankTransfer' | 'WhatsApp';
+
+export interface BannerSlide {
+  id: string;
+  kicker: string;
+  headline: string;
+  subtitle: string;
+  buttonLabel: string;
+  buttonLink: string;
+  imageUrl: string;
+  mobileFocus?: 'left' | 'center' | 'right';
+  active: boolean;
+  sortOrder: number;
+  createdAt?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -27,6 +43,7 @@ export interface Product {
   description: string;
   fabric?: string;
   imageUrl: string;
+  images?: string[];
   sizes: ProductSize[];
   inStock: boolean;
   featured: boolean;
@@ -62,7 +79,8 @@ export interface Order {
   address: string;
   city: string;
   notes?: string;
-  paymentMethod: 'COD' | 'WhatsApp';
+  paymentMethod: PaymentMethod;
+  paymentRef?: string;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;

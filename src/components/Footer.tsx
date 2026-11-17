@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MessageCircle, Phone } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { BRAND_INFO } from '../lib/firebase';
 import { buildWhatsAppUrl } from './Formatters';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 export const Footer: React.FC = () => {
   const [logoSrc, setLogoSrc] = useState(BRAND_INFO.logoUrl);
@@ -22,7 +23,7 @@ export const Footer: React.FC = () => {
                     setLogoSrc(BRAND_INFO.fallbackLogoUrl);
                   }
                 }}
-                className="h-16 w-16 rounded-full object-cover border border-[#B68167]/50 shadow-xs shrink-0"
+                className="h-20 w-20 rounded-full bg-white p-1 object-contain border border-[#E6DFD8] shadow-xs shrink-0"
               />
               <div>
                 <p className="font-display text-2xl font-semibold text-[#232220]">
@@ -144,9 +145,9 @@ export const Footer: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="LibasVibe WhatsApp"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E6DFD8] bg-white text-[#232220] transition-colors hover:border-[#B68167] hover:text-[#B68167]"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E6DFD8] bg-white text-[#25D366] transition-colors hover:border-[#25D366] hover:bg-[#25D366] hover:text-white"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <WhatsAppIcon className="h-4 w-4" />
                 </a>
               </li>
             </ul>

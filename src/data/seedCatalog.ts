@@ -1,10 +1,37 @@
-import { Category, Product } from '../types/store';
+import { BannerSlide, Category, Product } from '../types/store';
 
 export const HERO_BANNER_IMAGE =
   '/src/assets/images/hero_couture_banner_1794830694014.jpg';
 
 export const CAMPAIGN_BANNER_IMAGE =
   '/src/assets/images/campaign_pret_banner_1794830693262.jpg';
+
+export const SEED_BANNERS: BannerSlide[] = [
+  {
+    id: 'banner-hero-1',
+    kicker: 'LibasVibe by Farhan',
+    headline: 'Crafted Grace in Motion',
+    subtitle: 'Contemporary pret and festive couture tailored in silk and damask.',
+    buttonLabel: 'Shop Collection',
+    buttonLink: '/shop',
+    imageUrl: HERO_BANNER_IMAGE,
+    mobileFocus: 'right',
+    active: true,
+    sortOrder: 1,
+  },
+  {
+    id: 'banner-hero-2',
+    kicker: 'Seasonal Lookbook',
+    headline: 'Signature Damask & Silk',
+    subtitle: 'Effortless drape with brushed rose-copper detailing.',
+    buttonLabel: 'Explore Collections',
+    buttonLink: '/collections',
+    imageUrl: CAMPAIGN_BANNER_IMAGE,
+    mobileFocus: 'left',
+    active: true,
+    sortOrder: 2,
+  },
+];
 
 export const SEED_CATEGORIES: Category[] = [
   {

@@ -35,7 +35,7 @@ export const AboutPage: React.FC = () => {
                     setLogoSrc(BRAND_INFO.fallbackLogoUrl);
                   }
                 }}
-                className="h-14 w-14 rounded-full object-cover border border-[#E6DFD8]"
+                className="h-16 w-16 rounded-full bg-white p-1 object-contain border border-[#E6DFD8]"
               />
               <div>
                 <p className="font-display text-xl font-semibold text-[#232220]">

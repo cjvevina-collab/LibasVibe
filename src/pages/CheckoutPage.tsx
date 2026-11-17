@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, MessageCircle, ShoppingBag } from 'lucide-react';
+import { Check, CheckCircle2, Copy, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useStore } from '../context/StoreContext';
-import { Order } from '../types/store';
+import { Order, PaymentMethod } from '../types/store';
 import {
   buildWhatsAppUrl,
   formatPKR,
   formatPKRDecimal,
 } from '../components/Formatters';
 import { BRAND_INFO } from '../lib/firebase';
+import { WhatsAppIcon } from '../components/WhatsAppIcon';
 
 export const CheckoutPage: React.FC = () => {
   const { items, subtotal, deliveryFee, grandTotal, clearCart } = useCart();
@@ -21,11 +22,19 @@ export const CheckoutPage: React.FC = () => {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'WhatsApp'>('COD');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  const [paymentRef, setPaymentRef] = useState('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+
+  const copyAccount = (value: string, label: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +67,10 @@ export const CheckoutPage: React.FC = () => {
         city,
         notes,
         paymentMethod,
+        paymentRef:
+          paymentMethod === 'Easypaisa' || paymentMethod === 'BankTransfer'
+            ? paymentRef
+            : undefined,
         items: items.map((i) => ({
           productId: i.productId,
           title: i.title,
@@ -81,12 +94,14 @@ export const CheckoutPage: React.FC = () => {
   };
 
   if (confirmedOrder) {
-    const waSummary = `Assalam-o-Alaikum ${BRAND_INFO.name}, I placed order ${confirmedOrder.orderCode}:\nName: ${confirmedOrder.customerName}\nPhone: ${confirmedOrder.phone}\nCity: ${confirmedOrder.city}\nTotal: ${formatPKRDecimal(confirmedOrder.total)}`;
+    const waSummary = `Assalam-o-Alaikum ${BRAND_INFO.name}, I placed order ${confirmedOrder.orderCode}:\nName: ${confirmedOrder.customerName}\nPhone: ${confirmedOrder.phone}\nCity: ${confirmedOrder.city}\nPayment: ${confirmedOrder.paymentMethod}${
+      confirmedOrder.paymentRef ? ` (${confirmedOrder.paymentRef})` : ''
+    }\nTotal: ${formatPKRDecimal(confirmedOrder.total)}`;
 
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
         <div className="rounded-2xl border border-[#E6DFD8] bg-white p-8 sm:p-10">
-          <div className="flex items-center gap-3 text-[#97634A]">
+          <div className="flex items-center gap-3 text-[#5C1626]">
             <CheckCircle2 className="h-7 w-7" />
             <span className="text-xs font-semibold uppercase tracking-[0.16em]">
               Order Saved
@@ -134,12 +149,14 @@ export const CheckoutPage: React.FC = () => {
               ))}
               <div className="flex justify-between pt-2 text-xs text-[#68625C]">
                 <span>Standard Delivery</span>
-                <span className="tabular-nums">
-                  {formatPKRDecimal(confirmedOrder.deliveryFee)}
+                <span className="tabular-nums font-medium text-[#232220]">
+                  {confirmedOrder.deliveryFee === 0
+                    ? 'Free'
+                    : formatPKRDecimal(confirmedOrder.deliveryFee)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-[#E6DFD8] pt-2 text-base font-semibold text-[#232220]">
-                <span>Total Payable ({confirmedOrder.paymentMethod})</span>
+                <span>Total ({confirmedOrder.paymentMethod})</span>
                 <span className="tabular-nums">
                   {formatPKRDecimal(confirmedOrder.total)}
                 </span>
@@ -152,9 +169,9 @@ export const CheckoutPage: React.FC = () => {
               href={buildWhatsAppUrl(waSummary)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#232220] px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#B68167]"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#232220] px-6 py-3.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-[#5C1626]"
             >
-              <MessageCircle className="h-4 w-4" />
+              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
               <span>Share on WhatsApp</span>
             </a>
             <Link
@@ -183,7 +200,7 @@ export const CheckoutPage: React.FC = () => {
         </p>
         <Link
           to="/shop"
-          className="mt-6 inline-flex rounded-full bg-[#232220] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#B68167]"
+          className="mt-6 inline-flex rounded-full bg-[#5C1626] px-6 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#46101C]"
         >
           Browse Shop
         </Link>
@@ -203,7 +220,6 @@ export const CheckoutPage: React.FC = () => {
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12">
-        {/* Form */}
         <form
           onSubmit={handleSubmit}
           className="lg:col-span-7 space-y-6 rounded-2xl border border-[#E6DFD8] bg-white p-6 sm:p-8"
@@ -296,29 +312,119 @@ export const CheckoutPage: React.FC = () => {
               Payment Method
             </label>
             <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('COD')}
-                className={`rounded-xl border p-3.5 text-left text-sm transition-colors ${
-                  paymentMethod === 'COD'
-                    ? 'border-[#232220] bg-[#FAF9F7] font-medium text-[#232220]'
-                    : 'border-[#E6DFD8] text-[#68625C] hover:border-[#B68167]'
-                }`}
-              >
-                Cash on Delivery (COD)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('WhatsApp')}
-                className={`rounded-xl border p-3.5 text-left text-sm transition-colors ${
-                  paymentMethod === 'WhatsApp'
-                    ? 'border-[#232220] bg-[#FAF9F7] font-medium text-[#232220]'
-                    : 'border-[#E6DFD8] text-[#68625C] hover:border-[#B68167]'
-                }`}
-              >
-                Confirm via WhatsApp
-              </button>
+              {(
+                [
+                  { id: 'COD', label: 'Cash on Delivery (COD)' },
+                  { id: 'Easypaisa', label: 'Easypaisa' },
+                  { id: 'BankTransfer', label: 'Bank Al Habib Ltd' },
+                  { id: 'WhatsApp', label: 'Confirm via WhatsApp' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPaymentMethod(opt.id)}
+                  className={`rounded-xl border p-3.5 text-left text-sm transition-colors ${
+                    paymentMethod === opt.id
+                      ? 'border-[#5C1626] bg-[#5C1626]/5 font-semibold text-[#5C1626]'
+                      : 'border-[#E6DFD8] text-[#68625C] hover:border-[#B68167]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
+
+            {paymentMethod === 'Easypaisa' && (
+              <div className="mt-3 rounded-xl border border-[#E6DFD8] bg-[#FAF9F7] p-4 text-sm space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-[#68625C]">
+                      Easypaisa Account
+                    </p>
+                    <p className="mt-0.5 font-semibold text-[#232220] tabular-nums">
+                      {BRAND_INFO.easypaisa.number}
+                    </p>
+                    <p className="text-xs text-[#68625C]">
+                      Account Title: {BRAND_INFO.easypaisa.title}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyAccount(BRAND_INFO.easypaisa.number, 'easypaisa')
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E6DFD8] bg-white px-3 py-1.5 text-xs font-medium text-[#232220]"
+                  >
+                    {copiedField === 'easypaisa' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-[#5C1626]" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={paymentRef}
+                  onChange={(e) => setPaymentRef(e.target.value)}
+                  placeholder="Optional: Easypaisa Transaction ID (TID)"
+                  className="w-full rounded-lg border border-[#E6DFD8] bg-white px-3 py-2 text-xs text-[#232220] focus:border-[#B68167] focus:outline-none"
+                />
+              </div>
+            )}
+
+            {paymentMethod === 'BankTransfer' && (
+              <div className="mt-3 rounded-xl border border-[#E6DFD8] bg-[#FAF9F7] p-4 text-sm space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-[#68625C]">
+                      {BRAND_INFO.bankAlHabib.bankName}
+                    </p>
+                    <p className="mt-0.5 font-semibold text-[#232220] tabular-nums">
+                      {BRAND_INFO.bankAlHabib.accountNumber}
+                    </p>
+                    <p className="text-xs text-[#68625C]">
+                      Account Title: {BRAND_INFO.bankAlHabib.accountTitle}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyAccount(
+                        BRAND_INFO.bankAlHabib.accountNumber,
+                        'bank'
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#E6DFD8] bg-white px-3 py-1.5 text-xs font-medium text-[#232220] shrink-0"
+                  >
+                    {copiedField === 'bank' ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-[#5C1626]" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={paymentRef}
+                  onChange={(e) => setPaymentRef(e.target.value)}
+                  placeholder="Optional: Bank Transfer Reference / Sender Name"
+                  className="w-full rounded-lg border border-[#E6DFD8] bg-white px-3 py-2 text-xs text-[#232220] focus:border-[#B68167] focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -337,7 +443,7 @@ export const CheckoutPage: React.FC = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-full bg-[#232220] px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#B68167] disabled:opacity-50"
+            className="w-full rounded-full bg-[#5C1626] px-6 py-4 text-xs font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#46101C] disabled:opacity-50"
           >
             {submitting
               ? 'Saving Order...'
@@ -345,7 +451,6 @@ export const CheckoutPage: React.FC = () => {
           </button>
         </form>
 
-        {/* Summary */}
         <aside className="lg:col-span-5">
           <div className="rounded-2xl border border-[#E6DFD8] bg-white p-6 sm:p-8">
             <h2 className="font-display text-2xl font-semibold text-[#232220]">
@@ -388,8 +493,8 @@ export const CheckoutPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-[#68625C]">
                 <span>Standard Delivery</span>
-                <span className="tabular-nums text-[#232220]">
-                  {formatPKRDecimal(deliveryFee)}
+                <span className="tabular-nums font-medium text-[#232220]">
+                  {deliveryFee === 0 ? 'Free' : formatPKRDecimal(deliveryFee)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-[#E6DFD8] pt-3 text-base font-semibold text-[#232220]">

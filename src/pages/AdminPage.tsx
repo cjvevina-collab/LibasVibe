@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   FolderPlus,
+  Image as ImageIcon,
   ImagePlus,
   Layers,
   Lock,
@@ -22,10 +23,23 @@ import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { ADMIN_UID, BRAND_INFO } from '../lib/firebase';
 import { uploadImageToImgBB } from '../lib/imgbb';
-import { Category, Order, OrderStatus, Product, ProductSize } from '../types/store';
+import {
+  BannerSlide,
+  Category,
+  Order,
+  OrderStatus,
+  Product,
+  ProductSize,
+} from '../types/store';
 import { formatPKR, formatPKRDecimal } from '../components/Formatters';
 
-type AdminTab = 'overview' | 'products' | 'categories' | 'orders' | 'settings';
+type AdminTab =
+  | 'overview'
+  | 'products'
+  | 'categories'
+  | 'banners'
+  | 'orders'
+  | 'settings';
 
 const ALL_SIZES: ProductSize[] = ['XS', 'S', 'M', 'L', 'XL'];
 const ORDER_STATUSES: OrderStatus[] = [
@@ -41,6 +55,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
       return request.auth != null && request.auth.uid == '${ADMIN_UID}';
+    }
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /categories/{categoryId} {
       allow read: if true;
@@ -59,14 +77,19 @@ service cloud.firestore {
 }`;
 
 export const AdminPage: React.FC = () => {
-  const { user, loading: authLoading, isAdmin, loginWithEmail, logout } = useAuth();
+  const { user, loading: authLoading, isAdmin, loginWithEmail, logout } =
+    useAuth();
   const {
+    banners,
     categories,
     products,
     orders,
     isUsingSeedFallback,
     firestoreError,
     firestoreNeedsRules,
+    addBanner,
+    updateBanner,
+    deleteBanner,
     addCategory,
     updateCategory,
     deleteCategory,
@@ -79,7 +102,7 @@ export const AdminPage: React.FC = () => {
     deleteOrder,
   } = useStore();
 
-  // Auth form state (no hardcoded credentials)
+  // Auth form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -93,7 +116,7 @@ export const AdminPage: React.FC = () => {
   const [seeding, setSeeding] = useState(false);
   const [rulesCopied, setRulesCopied] = useState(false);
 
-  // Product modal state
+  // Product modal state (Multi-Image Support)
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [pTitle, setPTitle] = useState('');
@@ -103,7 +126,8 @@ export const AdminPage: React.FC = () => {
   const [pComparePrice, setPComparePrice] = useState('');
   const [pFabric, setPFabric] = useState('');
   const [pDescription, setPDescription] = useState('');
-  const [pImageUrl, setPImageUrl] = useState('');
+  const [pImages, setPImages] = useState<string[]>([]);
+  const [pImageUrlInput, setPImageUrlInput] = useState('');
   const [pSizes, setPSizes] = useState<ProductSize[]>(['S', 'M', 'L']);
   const [pInStock, setPInStock] = useState(true);
   const [pFeatured, setPFeatured] = useState(true);
@@ -120,6 +144,23 @@ export const AdminPage: React.FC = () => {
   const [cImageUrl, setCImageUrl] = useState('');
   const [uploadingCatImg, setUploadingCatImg] = useState(false);
   const [savingCat, setSavingCat] = useState(false);
+
+  // Banner modal state
+  const [bannerModalOpen, setBannerModalOpen] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<BannerSlide | null>(null);
+  const [bKicker, setBKicker] = useState('');
+  const [bHeadline, setBHeadline] = useState('');
+  const [bSubtitle, setBSubtitle] = useState('');
+  const [bButtonLabel, setBButtonLabel] = useState('Shop Collection');
+  const [bButtonLink, setBButtonLink] = useState('/shop');
+  const [bImageUrl, setBImageUrl] = useState('');
+  const [bMobileFocus, setBMobileFocus] = useState<'left' | 'center' | 'right'>(
+    'center'
+  );
+  const [bActive, setBActive] = useState(true);
+  const [bSortOrder, setBSortOrder] = useState('1');
+  const [uploadingBannerImg, setUploadingBannerImg] = useState(false);
+  const [savingBanner, setSavingBanner] = useState(false);
 
   // Order detail modal state
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -139,13 +180,16 @@ export const AdminPage: React.FC = () => {
       setPassword('');
     } catch (err) {
       setAuthError(
-        err instanceof Error ? err.message : 'Sign-in failed. Check email and password.'
+        err instanceof Error
+          ? err.message
+          : 'Sign-in failed. Check email and password.'
       );
     } finally {
       setSigningIn(false);
     }
   };
 
+  // Product Handlers
   const openAddProduct = () => {
     setEditingProduct(null);
     setPTitle('');
@@ -155,7 +199,8 @@ export const AdminPage: React.FC = () => {
     setPComparePrice('');
     setPFabric('');
     setPDescription('');
-    setPImageUrl('');
+    setPImages([]);
+    setPImageUrlInput('');
     setPSizes(['S', 'M', 'L', 'XL']);
     setPInStock(true);
     setPFeatured(true);
@@ -171,38 +216,68 @@ export const AdminPage: React.FC = () => {
     setPComparePrice(prod.compareAtPrice ? String(prod.compareAtPrice) : '');
     setPFabric(prod.fabric || '');
     setPDescription(prod.description);
-    setPImageUrl(prod.imageUrl);
+    const existingImgs =
+      prod.images && prod.images.length > 0
+        ? prod.images
+        : prod.imageUrl
+        ? [prod.imageUrl]
+        : [];
+    setPImages(existingImgs);
+    setPImageUrlInput('');
     setPSizes(prod.sizes.length > 0 ? prod.sizes : ['S', 'M', 'L']);
     setPInStock(prod.inStock);
     setPFeatured(prod.featured);
     setProductModalOpen(true);
   };
 
-  const handleProductImageUpload = async (
+  const handleProductImagesUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     setUploadingImage(true);
     setActionError(null);
     try {
-      const res = await uploadImageToImgBB(file);
-      setPImageUrl(res.displayUrl);
-      notify('Image uploaded to ImgBB.');
+      const uploadedUrls: string[] = [];
+      for (const file of files.slice(0, 5)) {
+        const res = await uploadImageToImgBB(file);
+        uploadedUrls.push(res.displayUrl);
+      }
+      setPImages((prev) => [...prev, ...uploadedUrls].slice(0, 6));
+      notify(
+        `${uploadedUrls.length} ${
+          uploadedUrls.length === 1 ? 'image' : 'images'
+        } uploaded to ImgBB.`
+      );
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : 'ImgBB upload failed.'
       );
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
+  };
+
+  const handleAddImageUrl = () => {
+    const url = pImageUrlInput.trim();
+    if (!url) return;
+    setPImages((prev) => [...prev, url].slice(0, 6));
+    setPImageUrlInput('');
+  };
+
+  const handleRemoveProductImage = (index: number) => {
+    setPImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionError(null);
-    if (!pImageUrl.trim()) {
-      setActionError('Please upload an image or paste an image URL.');
+    const finalImages = pImageUrlInput.trim()
+      ? [...pImages, pImageUrlInput.trim()]
+      : pImages;
+    if (finalImages.length === 0) {
+      setActionError('Please upload at least one product image or paste an image URL.');
       return;
     }
     setSavingProduct(true);
@@ -216,7 +291,8 @@ export const AdminPage: React.FC = () => {
           compareAtPrice: pComparePrice ? Number(pComparePrice) : undefined,
           fabric: pFabric,
           description: pDescription,
-          imageUrl: pImageUrl,
+          imageUrl: finalImages[0],
+          images: finalImages,
           sizes: pSizes,
           inStock: pInStock,
           featured: pFeatured,
@@ -231,7 +307,8 @@ export const AdminPage: React.FC = () => {
           compareAtPrice: pComparePrice ? Number(pComparePrice) : undefined,
           fabric: pFabric,
           description: pDescription,
-          imageUrl: pImageUrl,
+          imageUrl: finalImages[0],
+          images: finalImages,
           sizes: pSizes,
           inStock: pInStock,
           featured: pFeatured,
@@ -272,6 +349,7 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  // Category Handlers
   const openAddCategory = () => {
     setEditingCat(null);
     setCName('');
@@ -354,12 +432,118 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  // Banner Handlers
+  const openAddBanner = () => {
+    setEditingBanner(null);
+    setBKicker('LibasVibe by Farhan');
+    setBHeadline('');
+    setBSubtitle('');
+    setBButtonLabel('Shop Collection');
+    setBButtonLink('/shop');
+    setBImageUrl('');
+    setBMobileFocus('center');
+    setBActive(true);
+    setBSortOrder(String(banners.length + 1));
+    setBannerModalOpen(true);
+  };
+
+  const openEditBanner = (banner: BannerSlide) => {
+    setEditingBanner(banner);
+    setBKicker(banner.kicker || '');
+    setBHeadline(banner.headline);
+    setBSubtitle(banner.subtitle || '');
+    setBButtonLabel(banner.buttonLabel);
+    setBButtonLink(banner.buttonLink);
+    setBImageUrl(banner.imageUrl);
+    setBMobileFocus(banner.mobileFocus || 'center');
+    setBActive(banner.active);
+    setBSortOrder(String(banner.sortOrder || 1));
+    setBannerModalOpen(true);
+  };
+
+  const handleBannerImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBannerImg(true);
+    try {
+      const res = await uploadImageToImgBB(file);
+      setBImageUrl(res.displayUrl);
+      notify('Banner image uploaded to ImgBB.');
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'ImgBB upload failed.'
+      );
+    } finally {
+      setUploadingBannerImg(false);
+    }
+  };
+
+  const handleSaveBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionError(null);
+    if (!bImageUrl.trim()) {
+      setActionError('Please upload a banner image or paste an image URL.');
+      return;
+    }
+    setSavingBanner(true);
+    try {
+      if (editingBanner) {
+        await updateBanner(editingBanner.id, {
+          kicker: bKicker,
+          headline: bHeadline,
+          subtitle: bSubtitle,
+          buttonLabel: bButtonLabel,
+          buttonLink: bButtonLink,
+          imageUrl: bImageUrl,
+          mobileFocus: bMobileFocus,
+          active: bActive,
+          sortOrder: Number(bSortOrder) || 1,
+        });
+        notify('Banner updated.');
+      } else {
+        await addBanner({
+          kicker: bKicker,
+          headline: bHeadline,
+          subtitle: bSubtitle,
+          buttonLabel: bButtonLabel,
+          buttonLink: bButtonLink,
+          imageUrl: bImageUrl,
+          mobileFocus: bMobileFocus,
+          active: bActive,
+          sortOrder: Number(bSortOrder) || banners.length + 1,
+        });
+        notify('Banner added.');
+      }
+      setBannerModalOpen(false);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Unable to save banner.'
+      );
+    } finally {
+      setSavingBanner(false);
+    }
+  };
+
+  const handleDeleteBanner = async (banner: BannerSlide) => {
+    setActionError(null);
+    try {
+      await deleteBanner(banner.id);
+      notify(`Deleted banner "${banner.headline}".`);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Unable to delete banner.'
+      );
+    }
+  };
+
   const handleSeedCatalog = async () => {
     setSeeding(true);
     setActionError(null);
     try {
       await seedCatalogToFirestore();
-      notify('Sample categories and products synced to Firestore.');
+      notify('Banners, categories, and products synced to Firestore.');
     } catch (err) {
       setActionError(
         err instanceof Error
@@ -403,7 +587,7 @@ export const AdminPage: React.FC = () => {
     );
   }
 
-  // Protected Login Gate (Email & Password hidden/unfilled)
+  // Protected Login Gate
   if (!isAdmin) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 sm:py-24">
@@ -544,7 +728,7 @@ export const AdminPage: React.FC = () => {
               Firestore Rules Setup Pending on azee-12ad7
             </p>
             <p className="mt-0.5 text-[#68625C]">
-              Changes are currently saved in local browser storage. Publish the Firestore Rules in your Firebase Console so products, categories, and orders sync live across all visitors.
+              Changes are currently saved in local browser storage. Publish the Firestore Rules in your Firebase Console so products, banners, categories, and orders sync live across all visitors.
             </p>
           </div>
           <button
@@ -558,7 +742,7 @@ export const AdminPage: React.FC = () => {
       )}
       {(actionError || firestoreError) && (
         <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
-          <p className="font-semibold">Firestore Notice:</p>
+          <p className="font-semibold">Notice:</p>
           <p className="mt-1 break-all">{actionError || firestoreError}</p>
         </div>
       )}
@@ -570,6 +754,7 @@ export const AdminPage: React.FC = () => {
             { id: 'overview', label: 'Overview', icon: Layers },
             { id: 'products', label: `Products (${products.length})`, icon: Package },
             { id: 'categories', label: `Categories (${categories.length})`, icon: FolderPlus },
+            { id: 'banners', label: `Banners (${banners.length})`, icon: ImageIcon },
             { id: 'orders', label: `Orders (${orders.length})`, icon: ShoppingCart },
             { id: 'settings', label: 'Firebase Rules', icon: Database },
           ] as const
@@ -623,10 +808,10 @@ export const AdminPage: React.FC = () => {
             </div>
             <div className="rounded-2xl border border-[#E6DFD8] bg-white p-6">
               <p className="text-xs uppercase tracking-wider text-[#68625C]">
-                Categories
+                Active Banners
               </p>
               <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-[#232220]">
-                {categories.length}
+                {banners.filter((b) => b.active).length}
               </p>
             </div>
           </div>
@@ -661,7 +846,7 @@ export const AdminPage: React.FC = () => {
                         #{order.orderCode} · {order.customerName}
                       </p>
                       <p className="text-xs text-[#68625C]">
-                        {order.phone} · {order.city}
+                        {order.phone} · {order.city} · {order.paymentMethod}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -680,7 +865,7 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 2: Products (Add, Edit, Duplicate, Delete + ImgBB Upload) */}
+      {/* Tab 2: Products */}
       {activeTab === 'products' && (
         <div className="mt-8">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -701,7 +886,6 @@ export const AdminPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Mobile Product Cards */}
           <div className="mt-6 space-y-3 md:hidden">
             {filteredAdminProducts.map((prod) => (
               <div
@@ -723,7 +907,8 @@ export const AdminPage: React.FC = () => {
                       {prod.category} · {formatPKR(prod.price)}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[#97634A]">
-                      {prod.inStock ? 'In Stock' : 'Sold Out'}
+                      {prod.inStock ? 'In Stock' : 'Sold Out'} ·{' '}
+                      {prod.images?.length || 1} photo(s)
                     </p>
                   </div>
                 </div>
@@ -757,7 +942,6 @@ export const AdminPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Desktop Product Table */}
           <div className="mt-6 hidden md:block overflow-x-auto rounded-2xl border border-[#E6DFD8] bg-white">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-[#E6DFD8] bg-[#FAF9F7] text-xs uppercase tracking-wider text-[#68625C]">
@@ -785,7 +969,7 @@ export const AdminPage: React.FC = () => {
                             {prod.title}
                           </p>
                           <p className="text-xs text-[#68625C]">
-                            {prod.sku || prod.id}
+                            {prod.sku || prod.id} · {prod.images?.length || 1} img
                           </p>
                         </div>
                       </div>
@@ -810,7 +994,6 @@ export const AdminPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => openEditProduct(prod)}
-                          title="Edit product"
                           className="inline-flex items-center gap-1 rounded-lg border border-[#E6DFD8] px-2.5 py-1.5 text-xs font-medium text-[#232220] hover:border-[#B68167]"
                         >
                           <Pencil className="h-3 w-3" />
@@ -819,7 +1002,6 @@ export const AdminPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleDuplicate(prod)}
-                          title="Duplicate product"
                           className="inline-flex items-center gap-1 rounded-lg border border-[#E6DFD8] px-2.5 py-1.5 text-xs font-medium text-[#232220] hover:border-[#B68167]"
                         >
                           <Copy className="h-3 w-3" />
@@ -828,7 +1010,6 @@ export const AdminPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleDeleteProduct(prod)}
-                          title="Delete product"
                           className="inline-flex items-center gap-1 rounded-lg border border-[#E6DFD8] px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -915,7 +1096,92 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 4: Orders */}
+      {/* Tab 4: Banners Management */}
+      {activeTab === 'banners' && (
+        <div className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display text-2xl font-semibold text-[#232220]">
+                Homepage Banners
+              </h2>
+              <p className="text-xs text-[#68625C]">
+                Add, edit, or delete hero slider banners, images, headlines, and buttons.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openAddBanner}
+              className="inline-flex items-center gap-2 rounded-full bg-[#232220] px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-[#B68167]"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Banner</span>
+            </button>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+            {banners.map((banner) => (
+              <div
+                key={banner.id}
+                className="overflow-hidden rounded-2xl border border-[#E6DFD8] bg-white flex flex-col justify-between"
+              >
+                <div>
+                  <div className="relative aspect-[16/9] w-full bg-[#F3EFEA]">
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.headline}
+                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="uppercase tracking-wider text-[#97634A]">
+                        Slide #{banner.sortOrder} · {banner.active ? 'Active' : 'Hidden'}
+                      </span>
+                      <span className="text-[#68625C]">
+                        Mobile focus: {banner.mobileFocus || 'center'}
+                      </span>
+                    </div>
+                    <h3 className="mt-1.5 font-display text-2xl font-semibold text-[#232220]">
+                      {banner.headline}
+                    </h3>
+                    {banner.subtitle && (
+                      <p className="mt-1 text-xs text-[#68625C]">
+                        {banner.subtitle}
+                      </p>
+                    )}
+                    <p className="mt-3 text-xs text-[#232220]">
+                      Button: <span className="font-semibold">{banner.buttonLabel}</span> →{' '}
+                      <span className="text-[#68625C]">{banner.buttonLink}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 border-t border-[#E6DFD8] px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={() => openEditBanner(banner)}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#E6DFD8] py-2 text-xs font-medium text-[#232220] hover:border-[#B68167]"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Edit Banner</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBanner(banner)}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#E6DFD8] py-2 text-xs font-medium text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Orders */}
       {activeTab === 'orders' && (
         <div className="mt-8">
           <div className="overflow-x-auto rounded-2xl border border-[#E6DFD8] bg-white">
@@ -924,8 +1190,8 @@ export const AdminPage: React.FC = () => {
                 <tr>
                   <th className="px-5 py-3.5">Order ID</th>
                   <th className="px-5 py-3.5">Customer</th>
-                  <th className="px-5 py-3.5">City</th>
-                  <th className="px-5 py-3.5">Total (incl. Rs.199)</th>
+                  <th className="px-5 py-3.5">Payment</th>
+                  <th className="px-5 py-3.5">Total</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
@@ -950,10 +1216,13 @@ export const AdminPage: React.FC = () => {
                         <p className="font-medium text-[#232220]">
                           {order.customerName}
                         </p>
-                        <p className="text-xs text-[#68625C]">{order.phone}</p>
+                        <p className="text-xs text-[#68625C]">
+                          {order.phone} · {order.city}
+                        </p>
                       </td>
-                      <td className="px-5 py-4 text-[#68625C] whitespace-nowrap">
-                        {order.city}
+                      <td className="px-5 py-4 text-xs text-[#68625C] whitespace-nowrap">
+                        {order.paymentMethod}
+                        {order.paymentRef ? ` (${order.paymentRef})` : ''}
                       </td>
                       <td className="px-5 py-4 font-semibold tabular-nums text-[#232220] whitespace-nowrap">
                         {formatPKRDecimal(order.total)}
@@ -967,7 +1236,9 @@ export const AdminPage: React.FC = () => {
                                 order.id,
                                 e.target.value as OrderStatus
                               );
-                              notify(`Order #${order.orderCode} marked ${e.target.value}.`);
+                              notify(
+                                `Order #${order.orderCode} marked ${e.target.value}.`
+                              );
                             } catch (err) {
                               setActionError(
                                 err instanceof Error
@@ -1023,7 +1294,7 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 5: Firebase Rules & Configuration Reference */}
+      {/* Tab 6: Firebase Rules */}
       {activeTab === 'settings' && (
         <div className="mt-8 space-y-6">
           <div className="rounded-2xl border border-[#E6DFD8] bg-white p-6">
@@ -1031,11 +1302,11 @@ export const AdminPage: React.FC = () => {
               Firestore Security Rules (Project: azee-12ad7)
             </h2>
             <p className="mt-2 text-sm text-[#68625C]">
-              Your Admin Panel is locked strictly to Firebase Auth UID{' '}
+              Locked strictly to Firebase Auth UID{' '}
               <code className="rounded bg-[#F3EFEA] px-1.5 py-0.5 text-xs text-[#232220]">
                 {ADMIN_UID}
               </code>
-              . Paste these rules into your Firebase Console → Firestore Database → Rules tab so public shoppers can browse &amp; place orders while only your account can edit products, categories, and order statuses.
+              . Paste these rules in Firebase Console → Firestore Database → Rules.
             </p>
 
             <div className="mt-4 relative">
@@ -1068,7 +1339,7 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* Add / Edit Product Modal */}
+      {/* Add / Edit Product Modal (Multi-Image Upload) */}
       {productModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#232220]/50 p-4 backdrop-blur-[2px]"
@@ -1179,35 +1450,66 @@ export const AdminPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
-                  Product Image (Upload via ImgBB or Paste URL) *
+                  Product Photos (Upload 1–6 Images via ImgBB or Paste URLs) *
                 </label>
-                <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mt-1.5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
                   <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#B68167] bg-[#FAF9F7] px-4 py-2.5 text-xs font-medium text-[#97634A] hover:bg-[#F3EFEA] shrink-0">
                     <Upload className="h-3.5 w-3.5" />
-                    <span>{uploadingImage ? 'Uploading...' : 'Upload Photo'}</span>
+                    <span>
+                      {uploadingImage ? 'Uploading...' : 'Upload Photos (Multiple)'}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handleProductImageUpload}
+                      multiple
+                      onChange={handleProductImagesUpload}
                       className="hidden"
                     />
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={pImageUrl}
-                    onChange={(e) => setPImageUrl(e.target.value)}
-                    placeholder="https://i.ibb.co/..."
-                    className="flex-1 rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
-                  />
+                  <div className="flex flex-1 gap-2">
+                    <input
+                      type="text"
+                      value={pImageUrlInput}
+                      onChange={(e) => setPImageUrlInput(e.target.value)}
+                      placeholder="Or paste image URL (https://...)"
+                      className="flex-1 rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddImageUrl}
+                      className="rounded-lg border border-[#E6DFD8] bg-white px-3.5 py-2 text-xs font-medium text-[#232220] hover:border-[#B68167]"
+                    >
+                      Add URL
+                    </button>
+                  </div>
                 </div>
-                {pImageUrl && (
-                  <img
-                    src={pImageUrl}
-                    alt="Preview"
-                    referrerPolicy="no-referrer"
-                    className="mt-3 h-28 w-22 rounded-lg object-cover border border-[#E6DFD8]"
-                  />
+
+                {pImages.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {pImages.map((imgUrl, idx) => (
+                      <div key={`${imgUrl}-${idx}`} className="relative group">
+                        <img
+                          src={imgUrl}
+                          alt={`Product ${idx + 1}`}
+                          referrerPolicy="no-referrer"
+                          className="h-24 w-20 rounded-lg object-cover border border-[#E6DFD8]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductImage(idx)}
+                          aria-label="Remove image"
+                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#232220] text-white text-[10px]"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        {idx === 0 && (
+                          <span className="mt-1 block text-center text-[10px] font-medium text-[#97634A]">
+                            Main
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
@@ -1406,6 +1708,196 @@ export const AdminPage: React.FC = () => {
         </div>
       )}
 
+      {/* Add / Edit Banner Modal */}
+      {bannerModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#232220]/50 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[#E6DFD8] bg-white p-6 sm:p-8">
+            <div className="flex items-center justify-between border-b border-[#E6DFD8] pb-4">
+              <h2 className="font-display text-2xl font-semibold text-[#232220]">
+                {editingBanner ? 'Edit Banner' : 'Add Banner'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setBannerModalOpen(false)}
+                className="rounded-full border border-[#E6DFD8] p-2 text-[#68625C]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBanner} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                  Banner Image (Upload via ImgBB or Paste URL) *
+                </label>
+                <div className="mt-1.5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#B68167] bg-[#FAF9F7] px-4 py-2.5 text-xs font-medium text-[#97634A] shrink-0">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>{uploadingBannerImg ? 'Uploading...' : 'Upload Banner'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleBannerImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bImageUrl}
+                    onChange={(e) => setBImageUrl(e.target.value)}
+                    placeholder="https://i.ibb.co/..."
+                    className="flex-1 rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                {bImageUrl && (
+                  <img
+                    src={bImageUrl}
+                    alt="Banner preview"
+                    referrerPolicy="no-referrer"
+                    className="mt-3 aspect-[16/9] w-full rounded-lg object-cover border border-[#E6DFD8]"
+                  />
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Small Kicker Text
+                  </label>
+                  <input
+                    type="text"
+                    value={bKicker}
+                    onChange={(e) => setBKicker(e.target.value)}
+                    placeholder="LibasVibe by Farhan"
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Headline *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bHeadline}
+                    onChange={(e) => setBHeadline(e.target.value)}
+                    placeholder="Crafted Grace in Motion"
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                  Subtitle
+                </label>
+                <input
+                  type="text"
+                  value={bSubtitle}
+                  onChange={(e) => setBSubtitle(e.target.value)}
+                  placeholder="Short editorial line"
+                  className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Button Text *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bButtonLabel}
+                    onChange={(e) => setBButtonLabel(e.target.value)}
+                    placeholder="Shop Collection"
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Button Link *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bButtonLink}
+                    onChange={(e) => setBButtonLink(e.target.value)}
+                    placeholder="/shop or /collections"
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Mobile Image Focus
+                  </label>
+                  <select
+                    value={bMobileFocus}
+                    onChange={(e) =>
+                      setBMobileFocus(
+                        e.target.value as 'left' | 'center' | 'right'
+                      )
+                    }
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  >
+                    <option value="center">Center</option>
+                    <option value="right">Right (Subject on Right)</option>
+                    <option value="left">Left (Subject on Left)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-[#68625C]">
+                    Slide Order
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bSortOrder}
+                    onChange={(e) => setBSortOrder(e.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-[#E6DFD8] bg-[#FAF9F7] px-3.5 py-2.5 text-sm focus:border-[#B68167] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bActive}
+                  onChange={(e) => setBActive(e.target.checked)}
+                  className="accent-[#B68167]"
+                />
+                <span>Banner Active (Visible on Homepage)</span>
+              </label>
+
+              <div className="flex justify-end gap-3 border-t border-[#E6DFD8] pt-5">
+                <button
+                  type="button"
+                  onClick={() => setBannerModalOpen(false)}
+                  className="rounded-full border border-[#E6DFD8] px-5 py-2.5 text-xs font-medium text-[#68625C]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingBanner}
+                  className="rounded-full bg-[#232220] px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white hover:bg-[#B68167] disabled:opacity-50"
+                >
+                  {savingBanner ? 'Saving...' : 'Save Banner'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Order Detail Modal */}
       {selectedOrder && (
         <div
@@ -1444,6 +1936,11 @@ export const AdminPage: React.FC = () => {
                 <p className="mt-2 text-xs text-[#232220]">
                   {selectedOrder.address}, {selectedOrder.city}
                 </p>
+                {selectedOrder.paymentRef && (
+                  <p className="mt-2 text-xs font-medium text-[#5C1626]">
+                    Payment Ref / TID: {selectedOrder.paymentRef}
+                  </p>
+                )}
                 {selectedOrder.notes && (
                   <p className="mt-2 text-xs text-[#97634A]">
                     Notes: {selectedOrder.notes}
@@ -1471,7 +1968,9 @@ export const AdminPage: React.FC = () => {
                 <div className="flex justify-between text-[#68625C]">
                   <span>Standard Delivery</span>
                   <span className="tabular-nums">
-                    {formatPKRDecimal(selectedOrder.deliveryFee)}
+                    {selectedOrder.deliveryFee === 0
+                      ? 'Free'
+                      : formatPKRDecimal(selectedOrder.deliveryFee)}
                   </span>
                 </div>
                 <div className="flex justify-between font-semibold text-[#232220]">

@@ -160,6 +160,21 @@ export const CartDrawer: React.FC = () => {
 
         {items.length > 0 && (
           <div className="border-t border-[#E6DFD8] bg-white px-6 py-5">
+            <div className="mb-3 rounded-lg bg-[#FAF9F7] px-3 py-2 text-xs text-[#68625C] border border-[#E6DFD8]">
+              {deliveryFee === 0 ? (
+                <span className="font-medium text-[#5C1626]">
+                  Free nationwide delivery unlocked (order above Rs. 5,000).
+                </span>
+              ) : (
+                <span>
+                  Add{' '}
+                  <span className="font-semibold text-[#232220] tabular-nums">
+                    {formatPKR(5001 - subtotal)}
+                  </span>{' '}
+                  more for Free Delivery.
+                </span>
+              )}
+            </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-[#68625C]">
                 <span>Subtotal</span>
@@ -169,8 +184,8 @@ export const CartDrawer: React.FC = () => {
               </div>
               <div className="flex justify-between text-[#68625C]">
                 <span>Standard Delivery</span>
-                <span className="tabular-nums text-[#232220]">
-                  {formatPKRDecimal(deliveryFee)}
+                <span className="tabular-nums font-medium text-[#232220]">
+                  {deliveryFee === 0 ? 'Free' : formatPKRDecimal(deliveryFee)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-[#E6DFD8] pt-3 text-base font-semibold text-[#232220]">
